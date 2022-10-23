@@ -1,0 +1,53 @@
+# composeファイルのバージョン指定
+version: "3.8"
+
+services:
+ # サービス（＝コンテナ）
+  db:
+    image: postgres:13.1-alpine
+    # 環境変数を定義
+    environment:
+      # OSのタイムゾーン
+      TZ: UTC
+      # postgresのタイムゾーン
+      PGTZ: UTC
+      # DBのパスワード
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    # ホスト側のディレクトリをコンテナで使用するために設定するキー。
+    # とっても便利なもの！！
+    # （例）ホスト(PC)の hoge = A が hoge=B に変更されても、buildしないとコンテナには反映されない。
+    # でもvolumeを設定すれば、buildしなくてもリアルタイムでコンテナに反映される！
+    volumes:
+      - "./api/tmp/db:/var/lib/postgresql/data"
+
+  api:
+    build:
+      context: ./api
+      # Dockerfileに変数を渡すキー
+      args:
+        WORKDIR: $WORKDIR
+    environment:
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    volumes:
+      - "./api:/$WORKDIR"
+    # サービスの依存関係を定義＝起動の順番を指定していると考えればOK。この場合はapiサーバを立ち上げた後にdbを立ち上げるよ、という意味
+    depends_on:
+      - db
+    # 公開したいポート番号：コンテナポート
+    # $API_PORTは.envで定義している
+    ports:
+      - "$API_PORT:3000"
+
+  front:
+    build:
+      context: ./front
+      args:
+        WORKDIR: $WORKDIR
+    command: yarn run dev
+    volumes:
+      - "./front:/$WORKDIR"
+    # $FRONT_PORTは.envで定義している
+    ports:
+      - "$FRONT_PORT:3000"
+    depends_on:
+      - api
